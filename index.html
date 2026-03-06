@@ -112,6 +112,28 @@ const SLOTS = {
   "ジョインハンズ":[{n:"オレンジ",p:"オレンジ"},{n:"青リボン",p:"青リボン"},{n:"緑リボン",p:"緑リボン"}],
 };
 
+// Main/Sub system for parade positions (data-driven)
+var PARADE_MAIN = {
+  "水色案内人": {main:"けん", subs:["りくと"]},
+  "紫案内人": {main:"こっきー", subs:["りくと"]},
+  "黄色案内人": {main:"みよ", subs:["もえか","こっきー","ちびもえ"]},
+  "ピンク案内人": {main:"ななこ", subs:["もえか","けん"]},
+  "黄色少女": {main:"ちびもえ", subs:["かの","ゆいこ"]},
+  "ピンク少女": {main:"かのん", subs:["ちーちゃん","ちびもえ"]},
+  "水色少女": {main:"ちーちゃん", subs:["ゆうな","まゆか"]},
+  "紫少女": {main:"ここな", subs:["ゆいこ","ゆうな","まゆか"]},
+  "水色ドーナツ": {main:"いおり", subs:["ひな","まゆか"]},
+  "紫ドーナツ": {main:"みずき", subs:["もえか","いおり"]},
+  "紫ギフト": {main:"かの", subs:["いおり","ここな","ちーちゃん"]},
+};
+
+// JH/Bingo role groups
+var JH_ORANGE = ["りくと","けん","こっきー"];
+var JH_BLUE = ["ゆみ","まゆか","もえか","みよ","もも","ひな","ななこ","ゆうな","ちーちゃん","ゆいこ","ちびもえ"];
+var JH_GREEN = ["ここな","かのん","みずき","かの","かなで","いおり","かんな","まゆか"];
+var BINGO_MC = ["ひな","みよ","ちーちゃん","こっきー","ななこ","まゆか","ゆみ","もも","ゆうな","もえか","けん","りくと","ちびもえ"];
+var BINGO_AC = ["かの","かんな","かなで","かのん","ここな","みずき","いおり","ちびもえ","もも","ゆうな","ゆいこ","ちーちゃん","ひな","ゆみ","まゆか"];
+
 const PC = {"水色案内人":"#7dd3fc","ピンク案内人":"#f9a8d4","紫案内人":"#c4b5fd","黄色案内人":"#fde047","水色少女":"#67e8f9","ピンク少女":"#f472b6","紫少女":"#a78bfa","黄色少女":"#facc15","ピンクカップ":"#fb7185","緑カップ":"#4ade80","水色ドーナツ":"#38bdf8","紫ドーナツ":"#8b5cf6","ピンクギフト":"#ec4899","紫ギフト":"#7c3aed","ビンゴMC":"#f97316","ビンゴAC":"#fb923c","晴れ着MC":"#e11d48","晴れ着":"#be123c","獅子舞":"#dc2626","大抽選会MC":"#ea580c","メロン":"#22c55e","リンゴ":"#ef4444","パイナップル":"#eab308","ブルーベリー":"#6366f1","オレンジ":"#f97316","GIVEU":"#14b8a6","青リボン":"#3b82f6","緑リボン":"#16a34a"};
 const LB = new Set(["#fde047","#facc15","#67e8f9","#7dd3fc","#4ade80","#f9a8d4","#fb923c"]);
 const IP = {
@@ -246,27 +268,110 @@ function daysDiff(d1,d2) {
   return Math.round((new Date(d2)-new Date(d1))/86400000);
 }
 
+function calcOverdue(ph, wd, lastDate) {
+  if(!ph||!ph.c||!wd) return {c:0,ds:999,rate:0,od:0.5};
+  var rate=ph.c/wd; var ei=1/rate; var ds=daysDiff(ph.ld,lastDate); var od=ds/ei;
+  return {c:ph.c,ds:ds,rate:Math.round(rate*100),od:od};
+}
+
 function doPredict(hist) {
   var a = doAnalyze(hist);
   var lastDate = a.fd.length > 0 ? a.fd[a.fd.length-1] : "2026-01-01";
-  var totalDays = a.fd.length;
   var res = {};
-  SH.forEach(function(show){
-    var slots = SLOTS[show] || [];
-    var sp = slots.map(function(slot){
-      var cn = slot.f || D.filter(function(d){var ph=a.info[d].ph[show][slot.p];return ph&&ph.c>0;});
+
+  // === Parade: Main/Sub system ===
+  var paradeSlots = SLOTS["パレード"];
+  var paradePreds = paradeSlots.map(function(slot){
+    // Fixed group slots (cups) - use overdue as before
+    if(slot.f){
+      var cn = slot.f;
       var scored = cn.map(function(dancer){
-        var ph = a.info[dancer] && a.info[dancer].ph[show] && a.info[dancer].ph[show][slot.p];
+        var ph = a.info[dancer] && a.info[dancer].ph["パレード"] && a.info[dancer].ph["パレード"][slot.p];
         var wd = a.info[dancer] ? a.info[dancer].wd.size : 0;
-        if(!ph||!ph.c||!wd) return {dancer:dancer,c:0,ds:999,rate:0,od:0.5};
-        var rate=ph.c/wd; var ei=1/rate; var ds=daysDiff(ph.ld,lastDate); var od=ds/ei;
-        return {dancer:dancer,c:ph.c,ds:ds,rate:Math.round(rate*100),od:od};
+        var s = calcOverdue(ph, wd, lastDate);
+        return {dancer:dancer,c:s.c,ds:s.ds,rate:s.rate,od:s.od};
       });
       scored.sort(function(a,b){return b.od-a.od;});
-      return {sn:slot.n,pos:slot.p,opt:!!slot.o,fix:!!slot.f,cands:scored};
+      return {sn:slot.n,pos:slot.p,opt:!!slot.o,fix:true,cands:scored};
+    }
+
+    // Main/Sub positions
+    var ms = PARADE_MAIN[slot.p];
+    if(ms){
+      var allCands = [ms.main].concat(ms.subs);
+      var scored = allCands.map(function(dancer,idx){
+        var ph = a.info[dancer] && a.info[dancer].ph["パレード"] && a.info[dancer].ph["パレード"][slot.p];
+        var wd = a.info[dancer] ? a.info[dancer].wd.size : 0;
+        var s = calcOverdue(ph, wd, lastDate);
+        // Main gets priority boost: if overdue is reasonable, main is predicted
+        var isMain = idx===0;
+        var boosted = isMain ? Math.max(s.od, 1.5) : s.od;
+        return {dancer:dancer,c:s.c,ds:s.ds,rate:s.rate,od:boosted,isMain:isMain};
+      });
+      scored.sort(function(a,b){return b.od-a.od;});
+      return {sn:slot.n,pos:slot.p,opt:!!slot.o,fix:false,cands:scored,hasMain:true,mainDancer:ms.main};
+    }
+
+    // Fallback: ピンクギフト etc - use overdue from all experienced dancers
+    var cn = D.filter(function(d){var ph=a.info[d].ph["パレード"][slot.p];return ph&&ph.c>0;});
+    var scored = cn.map(function(dancer){
+      var ph = a.info[dancer].ph["パレード"][slot.p];
+      var wd = a.info[dancer].wd.size;
+      var s = calcOverdue(ph, wd, lastDate);
+      return {dancer:dancer,c:s.c,ds:s.ds,rate:s.rate,od:s.od};
     });
-    res[show]=sp;
+    scored.sort(function(a,b){return b.od-a.od;});
+    return {sn:slot.n,pos:slot.p,opt:!!slot.o,fix:false,cands:scored};
   });
+  res["パレード"] = paradePreds;
+
+  // === Bingo: MC/AC with role groups ===
+  var bingoPreds = SLOTS["ビンゴ"].map(function(slot){
+    var group = slot.p==="ビンゴMC" ? BINGO_MC : BINGO_AC;
+    var scored = group.map(function(dancer){
+      var ph = a.info[dancer] && a.info[dancer].ph["ビンゴ"] && a.info[dancer].ph["ビンゴ"][slot.p];
+      var wd = a.info[dancer] ? a.info[dancer].wd.size : 0;
+      var s = calcOverdue(ph, wd, lastDate);
+      return {dancer:dancer,c:s.c,ds:s.ds,rate:s.rate,od:s.od};
+    });
+    scored.sort(function(a,b){return b.od-a.od;});
+    return {sn:slot.n,pos:slot.p,opt:false,fix:false,cands:scored,roleGroup:true};
+  });
+  res["ビンゴ"] = bingoPreds;
+
+  // === JH: Orange fixed to males, Blue/Green with role groups ===
+  var jhPreds = SLOTS["ジョインハンズ"].map(function(slot){
+    var group;
+    if(slot.p==="オレンジ") group = JH_ORANGE;
+    else if(slot.p==="青リボン") group = JH_BLUE;
+    else group = JH_GREEN;
+
+    var scored = group.map(function(dancer){
+      var ph = a.info[dancer] && a.info[dancer].ph["ジョインハンズ"] && a.info[dancer].ph["ジョインハンズ"][slot.p];
+      var wd = a.info[dancer] ? a.info[dancer].wd.size : 0;
+      var s = calcOverdue(ph, wd, lastDate);
+      return {dancer:dancer,c:s.c,ds:s.ds,rate:s.rate,od:s.od};
+    });
+    scored.sort(function(a,b){return b.od-a.od;});
+    var isFixed = slot.p==="オレンジ";
+    return {sn:slot.n,pos:slot.p,opt:false,fix:isFixed,cands:scored,roleGroup:!isFixed};
+  });
+  res["ジョインハンズ"] = jhPreds;
+
+  // === Seasonal show: keep existing fixed group logic ===
+  var seasonPreds = SLOTS["季節ショー"].map(function(slot){
+    var cn = slot.f || D.filter(function(d){var ph=a.info[d].ph["季節ショー"][slot.p];return ph&&ph.c>0;});
+    var scored = cn.map(function(dancer){
+      var ph = a.info[dancer] && a.info[dancer].ph["季節ショー"] && a.info[dancer].ph["季節ショー"][slot.p];
+      var wd = a.info[dancer] ? a.info[dancer].wd.size : 0;
+      var s = calcOverdue(ph, wd, lastDate);
+      return {dancer:dancer,c:s.c,ds:s.ds,rate:s.rate,od:s.od};
+    });
+    scored.sort(function(a,b){return b.od-a.od;});
+    return {sn:slot.n,pos:slot.p,opt:false,fix:!!slot.f,cands:scored};
+  });
+  res["季節ショー"] = seasonPreds;
+
   return res;
 }
 
@@ -457,7 +562,7 @@ function App() {
         {tab==="predict" && (
           <div>
             <div style={{background:"#fffbeb",border:"1px solid #fde68a",borderRadius:10,padding:12,marginBottom:16,fontSize:11,color:"#92400e",lineHeight:1.7}}>
-              <strong>予想ロジック：</strong>超過度（前回出演からの経過÷平均間隔）が最も高い人を予想。🔒＝担当固定枠
+              <strong>予想ロジック：</strong>パレードはメイン/代打システムで予測。⭐＝メイン担当、🔒＝固定枠。ビンゴ・JHはMC/AC枠で超過度順。
             </div>
             {SH.map(function(show){
               var sp = preds[show]||[];
@@ -479,8 +584,8 @@ function App() {
                         var isO = top.dancer===oshi;
                         return (
                           <div key={i} style={{display:"flex",alignItems:"center",gap:8,marginBottom:4,opacity:sl.opt?0.45:1}}>
-                            <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}><Tag p={sl.pos} s={true}/>{sl.fix && <span style={{fontSize:8}}>🔒</span>}</div>
-                            <div style={{fontSize:12,fontWeight:600,color:isO?"#ec4899":"#1e293b",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{isO?"💖":""}{top.dancer}</div>
+                            <div style={{display:"flex",alignItems:"center",gap:4,flexShrink:0}}><Tag p={sl.pos} s={true}/>{sl.fix && <span style={{fontSize:8}}>🔒</span>}{sl.hasMain && <span style={{fontSize:8}}>⭐</span>}</div>
+                            <div style={{fontSize:12,fontWeight:600,color:isO?"#ec4899":"#1e293b",flex:1,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{isO?"💖":""}{top.dancer}{sl.hasMain && top.dancer===sl.mainDancer?" ⭐":""}</div>
                             <div style={{width:60,flexShrink:0}}><OB r={top.od}/></div>
                           </div>
                         );
@@ -494,6 +599,8 @@ function App() {
                           <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:8}}>
                             <Tag p={sl.pos}/><span style={{fontSize:11,color:"#64748b",fontWeight:600}}>{sl.sn}</span>
                             {sl.fix && <span style={{fontSize:9,color:"#7c3aed",background:"#f5f3ff",padding:"1px 6px",borderRadius:4,fontWeight:600}}>🔒 固定</span>}
+                            {sl.hasMain && <span style={{fontSize:9,color:"#d97706",background:"#fffbeb",padding:"1px 6px",borderRadius:4,fontWeight:600}}>⭐ メイン/代打</span>}
+                            {sl.roleGroup && <span style={{fontSize:9,color:"#0891b2",background:"#ecfeff",padding:"1px 6px",borderRadius:4,fontWeight:600}}>👥 枠内ローテ</span>}
                             {sl.opt && <span style={{fontSize:9,color:"#94a3b8",background:"#f8fafc",padding:"1px 6px",borderRadius:4}}>16人日のみ</span>}
                           </div>
                           {sl.cands.map(function(c,ci){
@@ -501,7 +608,7 @@ function App() {
                             return (
                               <div key={ci} style={{display:"flex",alignItems:"center",gap:6,marginBottom:4}}>
                                 <div style={{width:20,height:20,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:9,fontWeight:700,background:isTop?"linear-gradient(135deg,#ec4899,#8b5cf6)":"#f1f5f9",color:isTop?"#fff":"#94a3b8",flexShrink:0}}>{ci+1}</div>
-                                <div style={{fontSize:12,fontWeight:isTop?700:500,color:isO?"#ec4899":isTop?"#1e293b":"#94a3b8",flex:1}}>{isO?"💖":""}{c.dancer} <span style={{fontSize:10,color:"#cbd5e1"}}>({c.c}回/{c.rate}%)</span></div>
+                                <div style={{fontSize:12,fontWeight:isTop?700:500,color:isO?"#ec4899":isTop?"#1e293b":"#94a3b8",flex:1}}>{isO?"💖":""}{c.dancer}{sl.hasMain && c.dancer===sl.mainDancer?" ⭐":""} <span style={{fontSize:10,color:"#cbd5e1"}}>({c.c}回/{c.rate}%)</span></div>
                                 <div style={{width:66,flexShrink:0}}><OB r={c.od}/></div>
                                 <div style={{fontSize:9,color:"#94a3b8",width:32,textAlign:"right",flexShrink:0}}>{c.ds}日前</div>
                               </div>
