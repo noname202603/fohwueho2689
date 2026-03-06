@@ -684,9 +684,11 @@ function App() {
 
             <div style={{marginTop:16,background:"#fff",borderRadius:12,padding:16,boxShadow:"0 1px 3px rgba(0,0,0,0.08)"}}>
               <div style={{fontSize:12,fontWeight:700,color:"#475569",marginBottom:8}}>☁️ データ管理</div>
-              <div style={{fontSize:11,color:"#94a3b8",marginBottom:8,lineHeight:1.6}}>データはGitHubに自動保存されます。PC・スマホどちらからでも同じデータにアクセスできます。</div>
-              <div style={{fontSize:11,color:"#64748b",marginBottom:8}}>追加データ: {uh.length}件</div>
+              <div style={{fontSize:11,color:"#94a3b8",marginBottom:8,lineHeight:1.6}}>データはJSONBin.ioに自動保存されます。PC・スマホどちらからでも同じデータにアクセスできます。</div>
+              <div style={{fontSize:11,color:"#64748b",marginBottom:8}}>追加データ: {uh.length}件 / 全データ: {allH.length}件</div>
               <button onClick={async function(){setSyncMsg("同期中...");try{var r=await window.storage.get("hl-v7");if(r&&r.value){setUh(JSON.parse(r.value));setSyncMsg("✅ 最新データを取得しました("+JSON.parse(r.value).length+"件)");}else{setSyncMsg("データなし");}}catch(e){setSyncMsg("❌ 取得に失敗");}setTimeout(function(){setSyncMsg("");},3000);}} style={{width:"100%",padding:10,borderRadius:8,border:"1px solid #e2e8f0",background:"#f8fafc",color:"#475569",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:6}}>🔄 最新データを取得</button>
+              <button onClick={function(){var all=JSON.stringify(allH,null,0);var b=new Blob([all],{type:"application/json"});var u=URL.createObjectURL(b);var a=document.createElement("a");a.href=u;a.download="shift-data-all.json";a.click();URL.revokeObjectURL(u);setSyncMsg("✅ 全データ("+allH.length+"件)をダウンロードしました");setTimeout(function(){setSyncMsg("");},3000);}} style={{width:"100%",padding:10,borderRadius:8,border:"1px solid #e2e8f0",background:"#f0fdf4",color:"#16a34a",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:6}}>📥 全データをダウンロード (JSON)</button>
+              <button onClick={function(){var ud=JSON.stringify(uh,null,0);var b=new Blob([ud],{type:"application/json"});var u=URL.createObjectURL(b);var a=document.createElement("a");a.href=u;a.download="shift-data-added.json";a.click();URL.revokeObjectURL(u);setSyncMsg("✅ 追加データ("+uh.length+"件)をダウンロードしました");setTimeout(function(){setSyncMsg("");},3000);}} style={{width:"100%",padding:10,borderRadius:8,border:"1px solid #e2e8f0",background:"#eff6ff",color:"#2563eb",fontSize:12,fontWeight:600,cursor:"pointer",fontFamily:"inherit",marginBottom:6}}>📥 追加データのみダウンロード (JSON)</button>
               {uh.length>0 && (
                 <button onClick={delUD} style={{width:"100%",padding:8,borderRadius:6,border:"1px solid #fca5a5",background:"#fff",color:"#ef4444",fontSize:11,cursor:"pointer",fontFamily:"inherit",marginTop:4}}>追加データを全削除</button>
               )}
