@@ -76,7 +76,7 @@ const H = RAW.map(r => ({d:r[0],dt:r[1],s:r[2],p:r[3]}));
 const D = ["けん","こっきー","りくと","ちびもえ","かの","ちーちゃん","ななこ","かんな","かなで","まゆか","もえか","もも","いおり","みよ","ゆうな","ひな","ゆみ","ここな","かのん","みずき"];
 const SH = ["ビンゴ","パレード","季節ショー","ジョインハンズ"];
 const CL = new Set(["2026-01-07","2026-01-08","2026-01-14","2026-01-15","2026-01-21","2026-01-22","2026-01-28","2026-01-29","2026-02-04","2026-02-05","2026-02-12","2026-02-25","2026-02-26","2026-03-05","2026-03-11","2026-03-12","2026-03-19","2026-04-08","2026-04-09","2026-04-15","2026-04-22","2026-04-23"]);
-const FULL_THRESHOLD = 28;
+const FULL_THRESHOLD = 27;
 function fullDays(hist) {
   var dc = {};
   hist.forEach(function(r){dc[r.dt]=(dc[r.dt]||0)+1;});
@@ -253,6 +253,7 @@ function doAnalyze(hist) {
     SH.forEach(function(s){info[d].ph[s]={};});
   });
   hist.forEach(function(r){
+    if(r.s==="おやすみ") return;
     var di = info[r.d]; if(!di) return;
     di.wd.add(r.dt);
     if(!di.ph[r.s][r.p]) di.ph[r.s][r.p]={c:0,ld:""};
@@ -374,15 +375,16 @@ function doPredict(hist) {
   return res;
 }
 
-function workPat(hist, dancer) {
+function workPat(hist, dancer, extraRest) {
   var wd = new Set();
-  hist.forEach(function(r){if(r.d===dancer) wd.add(r.dt);});
+  hist.forEach(function(r){if(r.d===dancer&&r.s!=="おやすみ") wd.add(r.dt);});
   var fo = fullDays(hist);
+  var ex = extraRest || new Set();
   var days = parkDays(2026,1).concat(parkDays(2026,2)).concat(parkDays(2026,3)).concat(parkDays(2026,4));
   var pat = []; var cw=0; var cr=0; var last=null;
   days.forEach(function(d){
     var isW = wd.has(d);
-    var isR = fo.has(d) && !isW;
+    var isR = (fo.has(d) || ex.has(d)) && !isW;
     if(isW){if(last==="r"){pat.push({t:"r",d:cr});cr=0;} cw++; last="w";}
     else if(isR){if(last==="w"){pat.push({t:"w",d:cw});cw=0;} cr++; last="r";}
   });
@@ -437,6 +439,8 @@ function App() {
   var oshi = "もえか";
   var _om = useState(1);
   var oMonth = _om[0]; var setOMonth = _om[1];
+  var _rm = useState(4);
+  var rMonth = _rm[0]; var setRMonth = _rm[1];
   var _ld = useState(true);
   var loading = _ld[0]; var setLoading = _ld[1];
   var _sv = useState("");
@@ -453,16 +457,20 @@ function App() {
 
   var allH = useMemo(function(){return H.concat(uh);},[uh]);
   var preds = useMemo(function(){return doPredict(allH);},[allH]);
-  var ana = useMemo(function(){return doAnalyze(allH);},[allH]);
-  var allDts = useMemo(function(){return Array.from(new Set(allH.map(function(r){return r.dt;}))).sort().reverse();},[allH]);
-  var oPat = useMemo(function(){return workPat(allH,oshi);},[allH]);
-  var fo = useMemo(function(){return fullDays(allH);},[allH]);
+  var allHWork = useMemo(function(){return allH.filter(function(r){return r.s!=="おやすみ";});},[allH]);
+  var manualRestSet = useMemo(function(){
+    var s=new Set(); allH.forEach(function(r){if(r.d===oshi&&r.s==="おやすみ")s.add(r.dt);}); return s;
+  },[allH,oshi]);
+  var ana = useMemo(function(){return doAnalyze(allHWork);},[allHWork]);
+  var allDts = useMemo(function(){return Array.from(new Set(allHWork.map(function(r){return r.dt;}))).sort().reverse();},[allHWork]);
+  var fo = useMemo(function(){return fullDays(allHWork);},[allHWork]);
+  var oPat = useMemo(function(){return workPat(allHWork,oshi,manualRestSet);},[allHWork,oshi,manualRestSet]);
 
   var oCal = useMemo(function(){
     var c = {};
-    allH.forEach(function(r){if(r.d===oshi){if(!c[r.dt])c[r.dt]=[];c[r.dt].push({s:r.s,p:r.p});}});
+    allHWork.forEach(function(r){if(r.d===oshi){if(!c[r.dt])c[r.dt]=[];c[r.dt].push({s:r.s,p:r.p});}});
     return c;
-  },[allH]);
+  },[allHWork,oshi]);
 
   var doParseText = useCallback(function(){setParsed(parseText(tInput));},[tInput]);
 
@@ -529,6 +537,28 @@ function App() {
     }catch(e){setSyncMsg("❌ 削除に失敗");}
     setTimeout(function(){setSyncMsg("");},3000);
   },[]);
+
+  var saveRest = useCallback(async function(dt){
+    setSyncMsg("保存中...");
+    try{
+      var existing=[];var r=await window.storage.get("hl-v7");if(r&&r.value)existing=JSON.parse(r.value);
+      existing.push({d:oshi,dt:dt,s:"おやすみ",p:"おやすみ"});
+      setUh(existing);await window.storage.set("hl-v7",JSON.stringify(existing));
+      setSyncMsg("✅ おやすみを登録しました");
+    }catch(e){setSyncMsg("❌ 保存に失敗");}
+    setTimeout(function(){setSyncMsg("");},3000);
+  },[oshi]);
+
+  var delRest = useCallback(async function(dt){
+    setSyncMsg("削除中...");
+    try{
+      var existing=[];var r=await window.storage.get("hl-v7");if(r&&r.value)existing=JSON.parse(r.value);
+      existing=existing.filter(function(e){return !(e.d===oshi&&e.dt===dt&&e.s==="おやすみ");});
+      setUh(existing);await window.storage.set("hl-v7",JSON.stringify(existing));
+      setSyncMsg("✅ おやすみを解除しました");
+    }catch(e){setSyncMsg("❌ 削除に失敗");}
+    setTimeout(function(){setSyncMsg("");},3000);
+  },[oshi]);
 
   var tabs = [{id:"predict",l:"🔮 予想"},{id:"oshi",l:"💖 推し"},{id:"input",l:"📝 入力"},{id:"stats",l:"📊 統計"},{id:"history",l:"📅 履歴"}];
 
@@ -668,18 +698,25 @@ function App() {
                 var wd = ["日","月","火","水","木","金","土"][dd.getDay()];
                 var isW = dd.getDay()===0||dd.getDay()===6;
                 var shows = oCal[dt];
-                var isObs = fo.has(dt) || !!shows;
+                var isManual = manualRestSet.has(dt);
+                var isAuto = fo.has(dt) && !shows;
+                var isObs = isAuto || !!shows || isManual;
                 return (
-                  <div key={dt} style={{display:"flex",alignItems:"center",gap:8,padding:"5px 0",borderBottom:"1px solid #f8fafc"}}>
+                  <div key={dt} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 0",borderBottom:"1px solid #f8fafc"}}>
                     <div style={{width:56,fontSize:11,fontWeight:600,color:isW?"#dc2626":"#475569",flexShrink:0}}>{dt.slice(5).replace("-","/")}({wd})</div>
                     {shows ? (
                       <div style={{display:"flex",flexWrap:"wrap",gap:3,flex:1}}>
                         {shows.map(function(s,i){return <Tag key={i} p={s.p} s={true}/>;})}
                       </div>
-                    ) : isObs ? (
-                      <span style={{fontSize:11,color:"#94a3b8",fontStyle:"italic"}}>お休み 😴</span>
+                    ) : isManual ? (
+                      <span style={{fontSize:11,color:"#94a3b8",fontStyle:"italic",flex:1}}>お休み 😴 <span style={{fontSize:9,color:"#cbd5e1"}}>(手動)</span></span>
+                    ) : isAuto ? (
+                      <span style={{fontSize:11,color:"#94a3b8",fontStyle:"italic",flex:1}}>お休み 😴</span>
                     ) : (
-                      <span style={{fontSize:11,color:"#e2e8f0"}}>—</span>
+                      <span style={{fontSize:11,color:"#e2e8f0",flex:1}}>—</span>
+                    )}
+                    {!shows && (
+                      <button onClick={function(){isManual?delRest(dt):saveRest(dt);}} style={{padding:"2px 7px",borderRadius:6,border:"1px solid",borderColor:isManual?"#fca5a5":"#e2e8f0",background:isManual?"#fff5f5":"#f8fafc",color:isManual?"#ef4444":"#94a3b8",fontSize:10,cursor:"pointer",fontFamily:"inherit",flexShrink:0}}>{isManual?"解除":"😴"}</button>
                     )}
                   </div>
                 );
@@ -805,16 +842,49 @@ function App() {
         {tab==="stats" && (
           <div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6,marginBottom:16}}>
-              {["all"].concat(SH).map(function(s){return (
+              {["all","おやすみ"].concat(SH).map(function(s){return (
                 <button key={s} onClick={function(){setFShow(s);}} style={{padding:"6px 12px",borderRadius:20,border:"1px solid",borderColor:fShow===s?"#7c3aed":"#e2e8f0",background:fShow===s?"#7c3aed":"#fff",color:fShow===s?"#fff":"#64748b",fontSize:11,fontWeight:600,cursor:"pointer",fontFamily:"inherit"}}>{s==="all"?"全体":s}</button>
               );})}
             </div>
-            {D.map(function(dancer){
+            {fShow==="おやすみ" ? (function(){
+              var days = parkDays(2026,rMonth);
+              return (
+                <div>
+                  <div style={{display:"flex",gap:6,marginBottom:12}}>
+                    {[1,2,3,4].map(function(m){return (
+                      <button key={m} onClick={function(){setRMonth(m);}} style={{flex:1,padding:"7px 4px",borderRadius:8,border:"1px solid",borderColor:rMonth===m?"#7c3aed":"#e2e8f0",background:rMonth===m?"#7c3aed":"#fff",color:rMonth===m?"#fff":"#64748b",fontSize:13,fontWeight:700,cursor:"pointer",fontFamily:"inherit"}}>{m}月</button>
+                    );})}
+                  </div>
+                  <div style={{background:"#fff",borderRadius:12,boxShadow:"0 1px 3px rgba(0,0,0,0.08)",overflow:"hidden"}}>
+                    {days.map(function(dt){
+                      var isFull = fo.has(dt);
+                      var absentD = isFull ? D.filter(function(d){return !allHWork.some(function(r){return r.d===d&&r.dt===dt;});}) : [];
+                      var manualD = D.filter(function(d){return manualRestSet.has && d===oshi && manualRestSet.has(dt) && !isFull;});
+                      var absent = absentD.concat(manualD);
+                      if(!isFull && !manualD.length) return null;
+                      var dd=new Date(dt); var w=["日","月","火","水","木","金","土"][dd.getDay()]; var isW=dd.getDay()===0||dd.getDay()===6;
+                      return (
+                        <div key={dt} style={{display:"flex",alignItems:"center",gap:10,padding:"8px 14px",borderBottom:"1px solid #f8fafc"}}>
+                          <div style={{width:62,fontSize:12,fontWeight:700,color:isW?"#dc2626":"#475569",flexShrink:0}}>{dt.slice(5).replace("-","/")}({w})</div>
+                          <div style={{display:"flex",flexWrap:"wrap",gap:4,flex:1}}>
+                            {absent.length ? absent.map(function(d){
+                              var isO=d===oshi;
+                              return <span key={d} style={{fontSize:12,padding:"2px 9px",borderRadius:12,background:isO?"#fce7f3":"#f1f5f9",color:isO?"#be185d":"#475569",fontWeight:isO?700:600,border:isO?"1px solid #f9a8d4":"none"}}>{isO?"💖":""}{d}</span>;
+                            }) : <span style={{fontSize:11,color:"#cbd5e1"}}>全員出勤</span>}
+                          </div>
+                          <span style={{fontSize:10,color:"#cbd5e1",flexShrink:0}}>{absent.length}人</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })() : D.map(function(dancer){
               var di = ana.info[dancer]; if(!di) return null;
               var isSel = selD===dancer;
               var wds = di.wd.size;
               var isO = dancer===oshi;
-              var wp = workPat(allH,dancer);
+              var wp = workPat(allHWork,dancer);
               return (
                 <div key={dancer} style={{background:isO?"#fdf2f8":"#fff",borderRadius:12,marginBottom:8,boxShadow:"0 1px 3px rgba(0,0,0,0.08)",overflow:"hidden",border:isO?"2px solid #f9a8d4":"none"}}>
                   <div onClick={function(){setSelD(isSel?null:dancer);}} style={{padding:"12px 16px",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
