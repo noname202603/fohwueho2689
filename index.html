@@ -74,7 +74,7 @@ const RAW = [["けん","2026-01-01","ビンゴ","晴れ着MC"],["けん","2026-0
 const H = RAW.map(r => ({d:r[0],dt:r[1],s:r[2],p:r[3]}));
 
 const D = ["けん","こっきー","りくと","ちびもえ","かの","ちーちゃん","ななこ","かんな","かなで","まゆか","もえか","もも","いおり","みよ","ゆうな","ひな","ゆみ","ここな","かのん","みずき"];
-const SH = ["ビンゴ","パレード","季節ショー","ジョインハンズ"];
+const SH = ["ビンゴ","パレード","季節ショー","ジョインハンズ","アニバグリ"];
 const CL = new Set(["2026-01-07","2026-01-08","2026-01-14","2026-01-15","2026-01-21","2026-01-22","2026-01-28","2026-01-29","2026-02-04","2026-02-05","2026-02-12","2026-02-25","2026-02-26","2026-03-05","2026-03-11","2026-03-12","2026-03-19","2026-04-08","2026-04-09","2026-04-15","2026-04-22","2026-04-23"]);
 const FULL_THRESHOLD = 27;
 function fullDays(hist) {
@@ -110,6 +110,7 @@ const SLOTS = {
     {n:"B紫",p:"B紫",f:["ななこ","みずき","もえか"]},
   ],
   "ジョインハンズ":[{n:"オレンジ",p:"オレンジ"},{n:"青リボン",p:"青リボン"},{n:"緑リボン",p:"緑リボン"}],
+  "アニバグリ":[{n:"MC",p:"アニバグリMC"},{n:"AC",p:"アニバグリAC"}],
 };
 
 // Main/Sub system for parade positions (data-driven)
@@ -134,13 +135,14 @@ var JH_GREEN = ["ここな","かのん","みずき","かの","かなで","いお
 var BINGO_MC = ["ひな","みよ","ちーちゃん","こっきー","ななこ","まゆか","ゆみ","もも","ゆうな","もえか","けん","りくと","ちびもえ"];
 var BINGO_AC = ["かの","かんな","かなで","かのん","ここな","みずき","いおり","ちびもえ","もも","ゆうな","ちーちゃん","ひな","ゆみ","まゆか"];
 
-const PC = {"水色案内人":"#7dd3fc","ピンク案内人":"#f9a8d4","紫案内人":"#c4b5fd","黄色案内人":"#fde047","水色少女":"#67e8f9","ピンク少女":"#f472b6","紫少女":"#a78bfa","黄色少女":"#facc15","ピンクカップ":"#fb7185","緑カップ":"#4ade80","水色ドーナツ":"#38bdf8","紫ドーナツ":"#8b5cf6","ピンクギフト":"#ec4899","紫ギフト":"#7c3aed","ビンゴMC":"#f97316","ビンゴAC":"#fb923c","晴れ着MC":"#e11d48","晴れ着":"#be123c","獅子舞":"#dc2626","大抽選会MC":"#ea580c","B赤":"#ef4444","Bピンク":"#f9a8d4","Bオレンジ":"#fb923c","B黄色":"#fde047","B緑":"#4ade80","B紫":"#a78bfa","メロン":"#22c55e","リンゴ":"#ef4444","パイナップル":"#eab308","ブルーベリー":"#6366f1","オレンジ":"#f97316","GIVEU":"#14b8a6","青リボン":"#3b82f6","緑リボン":"#16a34a"};
+const PC = {"水色案内人":"#7dd3fc","ピンク案内人":"#f9a8d4","紫案内人":"#c4b5fd","黄色案内人":"#fde047","水色少女":"#67e8f9","ピンク少女":"#f472b6","紫少女":"#a78bfa","黄色少女":"#facc15","ピンクカップ":"#fb7185","緑カップ":"#4ade80","水色ドーナツ":"#38bdf8","紫ドーナツ":"#8b5cf6","ピンクギフト":"#ec4899","紫ギフト":"#7c3aed","ビンゴMC":"#f97316","ビンゴAC":"#fb923c","晴れ着MC":"#e11d48","晴れ着":"#be123c","獅子舞":"#dc2626","大抽選会MC":"#ea580c","B赤":"#ef4444","Bピンク":"#f9a8d4","Bオレンジ":"#fb923c","B黄色":"#fde047","B緑":"#4ade80","B紫":"#a78bfa","メロン":"#22c55e","リンゴ":"#ef4444","パイナップル":"#eab308","ブルーベリー":"#6366f1","オレンジ":"#f97316","GIVEU":"#14b8a6","青リボン":"#3b82f6","緑リボン":"#16a34a","アニバグリMC":"#06b6d4","アニバグリAC":"#67e8f9"};
 const LB = new Set(["#fde047","#facc15","#67e8f9","#7dd3fc","#4ade80","#f9a8d4","#fb923c"]);
 const IP = {
   "ビンゴ":["ビンゴMC","ビンゴAC","晴れ着MC","晴れ着","獅子舞","大抽選会MC"],
   "パレード":["水色案内人","ピンク案内人","紫案内人","黄色案内人","水色少女","ピンク少女","紫少女","黄色少女","ピンクカップ","緑カップ","水色ドーナツ","紫ドーナツ","ピンクギフト","紫ギフト"],
   "季節ショー":["B赤","Bピンク","Bオレンジ","B黄色","B緑","B紫"],
   "ジョインハンズ":["GIVEU","オレンジ","青リボン","緑リボン"],
+  "アニバグリ":["アニバグリMC","アニバグリAC"],
 };
 
 function parseText(text) {
@@ -175,6 +177,7 @@ function parseText(text) {
     if (/ブルーミング|季節/.test(line) && line.length < 15) { curShow = "季節ショー"; sSec = ""; continue; }
     if (/ビンゴ/.test(line) && line.length < 10) { curShow = "ビンゴ"; continue; }
     if (/join|ジョイン|JH/i.test(line) && line.length < 15) { curShow = "ジョインハンズ"; continue; }
+    if (/アニバグリ/.test(line) && line.length < 15) { curShow = "アニバグリ"; continue; }
     if (!curShow) continue;
 
     if (curShow === "パレード") {
@@ -213,6 +216,13 @@ function parseText(text) {
     if (curShow === "ビンゴ") {
       if (/MC[:：]/.test(line)) { var bn = getName(line.split(/[:：]/)[1]||""); if(bn) entries.push({d:bn,dt:dateStr,s:"ビンゴ",p:"ビンゴMC"}); continue; }
       if (/A[TC][:：]/.test(line)) { var bn2 = getName(line.split(/[:：]/)[1]||""); if(bn2) entries.push({d:bn2,dt:dateStr,s:"ビンゴ",p:"ビンゴAC"}); continue; }
+      continue;
+    }
+
+    if (curShow === "アニバグリ") {
+      var ap = /MC/i.test(line) ? "アニバグリMC" : /AC/i.test(line) ? "アニバグリAC" : "";
+      var an = getName(line);
+      if (an && ap) entries.push({d:an,dt:dateStr,s:"アニバグリ",p:ap});
       continue;
     }
 
@@ -357,6 +367,19 @@ function doPredict(hist) {
     return {sn:slot.n,pos:slot.p,opt:false,fix:isFixed,cands:scored,roleGroup:!isFixed};
   });
   res["ジョインハンズ"] = jhPreds;
+
+  // === アニバグリ: MC/AC 全員対象 ===
+  var anivaPreds = SLOTS["アニバグリ"].map(function(slot){
+    var scored = D.map(function(dancer){
+      var ph = a.info[dancer] && a.info[dancer].ph["アニバグリ"] && a.info[dancer].ph["アニバグリ"][slot.p];
+      var wd = a.info[dancer] ? a.info[dancer].wd.size : 0;
+      var s = calcOverdue(ph, wd, lastDate);
+      return {dancer:dancer,c:s.c,ds:s.ds,rate:s.rate,od:s.od};
+    });
+    scored.sort(function(a,b){return b.od-a.od;});
+    return {sn:slot.n,pos:slot.p,opt:false,fix:false,cands:scored};
+  });
+  res["アニバグリ"] = anivaPreds;
 
   // === Seasonal show (ブルーミング): fixed color groups ===
   var seasonPreds = SLOTS["季節ショー"].map(function(slot){
